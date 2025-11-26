@@ -1,0 +1,9 @@
+{
+  "name": "FieldFocus",
+  "description": "A smart field visit management system allowing users to track customers, plan routes using geolocation, and manage visit history with AI-powered note enhancement.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
