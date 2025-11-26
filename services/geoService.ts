@@ -1,4 +1,4 @@
-import { Coordinates, Customer } from '../types';
+import { Coordinates, Account } from '../types';
 
 // Haversine formula to calculate distance in kilometers
 export const calculateDistance = (coord1: Coordinates, coord2: Coordinates): number => {
@@ -56,7 +56,7 @@ export const getCoordinatesFromAddress = async (query: string): Promise<{lat: nu
   }
 };
 
-export const buildGoogleMapsRouteUrl = (origin: Coordinates, stops: Customer[]): string => {
+export const buildGoogleMapsRouteUrl = (origin: Coordinates, stops: Account[]): string => {
   if (stops.length === 0) return '';
   
   const baseUrl = "https://www.google.com/maps/dir/?api=1";

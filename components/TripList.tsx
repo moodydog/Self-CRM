@@ -1,12 +1,11 @@
-
 import React, { useState } from 'react';
-import { Trip, Customer } from '../types';
+import { Trip, Account } from '../types';
 
 interface TripListProps {
   trips: Trip[];
-  customers: Customer[];
-  onLogVisitForCustomer: (customer: Customer) => void;
-  onViewCustomer: (customer: Customer) => void;
+  customers: Account[];
+  onLogVisitForCustomer: (customer: Account) => void;
+  onViewCustomer: (customer: Account) => void;
 }
 
 const TripList: React.FC<TripListProps> = ({ trips, customers, onLogVisitForCustomer, onViewCustomer }) => {
@@ -45,7 +44,7 @@ const TripList: React.FC<TripListProps> = ({ trips, customers, onLogVisitForCust
                                 <span className={`w-2 h-2 rounded-full ${trip.status === 'Completed' ? 'bg-green-500' : trip.status === 'In Progress' ? 'bg-blue-500' : 'bg-slate-300'}`}></span>
                                 <h3 className="font-bold text-slate-800 text-sm">{trip.name || 'Untitled Trip'}</h3>
                              </div>
-                             <p className="text-xs text-slate-500">{tripDate} • {trip.customerIds.length} stops</p>
+                             <p className="text-xs text-slate-500">{tripDate} • {trip.accountIds.length} stops</p>
                          </div>
                          <button className="text-slate-400">
                              <svg className={`w-5 h-5 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -56,7 +55,7 @@ const TripList: React.FC<TripListProps> = ({ trips, customers, onLogVisitForCust
                      {isExpanded && (
                          <div className="bg-slate-50 border-t border-slate-100 p-3 space-y-3">
                              <div className="relative pl-4 space-y-4 border-l-2 border-slate-200 ml-2">
-                                 {trip.customerIds.map((custId, index) => {
+                                 {trip.accountIds.map((custId, index) => {
                                      const customer = getCustomer(custId);
                                      if (!customer) return null;
                                      
@@ -69,7 +68,7 @@ const TripList: React.FC<TripListProps> = ({ trips, customers, onLogVisitForCust
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div>
                                                         <h4 className="font-bold text-slate-800 text-sm">{customer.name}</h4>
-                                                        <p className="text-xs text-slate-500">{customer.company}</p>
+                                                        <p className="text-xs text-slate-500">{customer.industry || customer.city}</p>
                                                     </div>
                                                     <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">#{index + 1}</span>
                                                 </div>

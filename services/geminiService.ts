@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Customer } from '../types';
+import { Account } from '../types';
 
 const getAiClient = () => {
   const apiKey = process.env.API_KEY;
@@ -35,7 +35,7 @@ export const polishVisitNotes = async (rawNotes: string): Promise<string> => {
   }
 };
 
-export const suggestOptimizedRoute = async (currentLocation: {lat: number, lng: number}, customers: Customer[]): Promise<string[]> => {
+export const suggestOptimizedRoute = async (currentLocation: {lat: number, lng: number}, customers: Account[]): Promise<string[]> => {
     const ai = getAiClient();
     if (!ai) return customers.map(c => c.id);
 

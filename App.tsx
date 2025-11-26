@@ -1,7 +1,8 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { Customer, Visit, ViewState, Coordinates, Trip, User, UserRole } from './types';
-import { INITIAL_CUSTOMERS, MOCK_VISIT_HISTORY, MOCK_TRIPS, MOCK_USERS } from './constants';
+import { Account, Contact, Opportunity, Visit, ViewState, Coordinates, Trip, User, UserRole } from './types';
+import { INITIAL_ACCOUNTS, INITIAL_CONTACTS, INITIAL_OPPORTUNITIES, MOCK_VISIT_HISTORY, MOCK_TRIPS, MOCK_USERS } from './constants';
 import CustomerList from './components/CustomerList';
 import CustomerDetail from './components/CustomerDetail';
 import VisitForm from './components/VisitForm';
@@ -11,6 +12,7 @@ import TripList from './components/TripList';
 import AuthScreen from './components/AuthScreen';
 import SettingsScreen from './components/SettingsScreen';
 import ManagerDashboard from './components/ManagerDashboard';
+import AdminDashboard from './components/AdminDashboard';
 import { buildGoogleMapsRouteUrl } from './services/geoService';
 
 const App: React.FC = () => {
@@ -22,10 +24,20 @@ const App: React.FC = () => {
 
   const [viewState, setViewState] = useState<ViewState>(currentUser ? ViewState.LIST : ViewState.AUTH);
 
-  const [customers, setCustomers] = useState<Customer[]>(() => {
-    const saved = localStorage.getItem('customers_v2');
-    return saved ? JSON.parse(saved) : INITIAL_CUSTOMERS;
+  // Data Stores
+  const [accounts, setAccounts] = useState<Account[]>(() => {
+    const saved = localStorage.getItem('accounts');
+    return saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
   });
+  const [contacts, setContacts] = useState<Contact[]>(() => {
+    const saved = localStorage.getItem('contacts');
+    return saved ? JSON.parse(saved) : INITIAL_CONTACTS;
+  });
+  const [opportunities, setOpportunities] = useState<Opportunity[]>(() => {
+      const saved = localStorage.getItem('opportunities');
+      return saved ? JSON.parse(saved) : INITIAL_OPPORTUNITIES;
+  });
+
   const [visits, setVisits] = useState<Visit[]>(() => {
     const saved = localStorage.getItem('visits');
     return saved ? JSON.parse(saved) : MOCK_VISIT_HISTORY;
@@ -34,185 +46,180 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('trips');
     return saved ? JSON.parse(saved) : MOCK_TRIPS;
   });
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
   
-  // Trip planning state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-
-  // Toast Notification
   const [toast, setToast] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
 
-  // --- Effects ---
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+        if (event.state && event.state.view) {
+            setViewState(event.state.view);
+            if (event.state.account) {
+                setSelectedAccount(event.state.account);
+            } else {
+                setSelectedAccount(null);
+            }
+        } else {
+            setViewState(currentUser ? ViewState.LIST : ViewState.AUTH);
+        }
+    };
+    window.addEventListener('popstate', handlePopState);
+    if (currentUser) {
+        window.history.replaceState({ view: ViewState.LIST }, '');
+    }
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [currentUser]);
+
+  const pushView = (view: ViewState, account: Account | null = null) => {
+      window.history.pushState({ view, account }, '');
+      setViewState(view);
+      setSelectedAccount(account);
+  };
+
   useEffect(() => {
     if (currentUser) {
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        if (viewState === ViewState.AUTH) {
+            if (currentUser.role === UserRole.ADMIN) setViewState(ViewState.ADMIN_DASHBOARD);
+            else if (currentUser.role === UserRole.MANAGER) setViewState(ViewState.MANAGER_DASHBOARD);
+            else setViewState(ViewState.LIST);
+        }
     } else {
         localStorage.removeItem('currentUser');
     }
   }, [currentUser]);
 
-  useEffect(() => {
-    localStorage.setItem('customers_v2', JSON.stringify(customers));
-  }, [customers]);
-
-  useEffect(() => {
-    localStorage.setItem('visits', JSON.stringify(visits));
-  }, [visits]);
-
-  useEffect(() => {
-    localStorage.setItem('trips', JSON.stringify(trips));
-  }, [trips]);
+  useEffect(() => localStorage.setItem('accounts', JSON.stringify(accounts)), [accounts]);
+  useEffect(() => localStorage.setItem('contacts', JSON.stringify(contacts)), [contacts]);
+  useEffect(() => localStorage.setItem('opportunities', JSON.stringify(opportunities)), [opportunities]);
+  useEffect(() => localStorage.setItem('visits', JSON.stringify(visits)), [visits]);
+  useEffect(() => localStorage.setItem('trips', JSON.stringify(trips)), [trips]);
 
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.error("Error getting location", error);
-          // Demo fallback (set to Delta BC for demo purposes)
-          setUserLocation({ lat: 49.0900, lng: -123.0800 }); 
-        }
+        (position) => setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude }),
+        (error) => { console.error("Error getting location", error); setUserLocation({ lat: 49.0900, lng: -123.0800 }); }
       );
     }
   }, []);
 
-  // Show toast with auto-hide
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
       setToast({ msg, type });
       setTimeout(() => setToast(null), 3000);
   };
 
-  // --- Handlers ---
-
   const handleLogin = (user: User) => {
       setCurrentUser(user);
-      setViewState(user.role === UserRole.MANAGER ? ViewState.MANAGER_DASHBOARD : ViewState.LIST);
+      if (user.role === UserRole.ADMIN) pushView(ViewState.ADMIN_DASHBOARD);
+      else if (user.role === UserRole.MANAGER) pushView(ViewState.MANAGER_DASHBOARD);
+      else pushView(ViewState.LIST);
   };
 
   const handleLogout = () => {
       setCurrentUser(null);
-      setViewState(ViewState.AUTH);
-      setSelectedCustomer(null);
+      pushView(ViewState.AUTH);
   };
 
-  const handleSelectCustomer = (customer: Customer) => {
-    setSelectedCustomer(customer);
-    setViewState(ViewState.CUSTOMER_DETAIL);
+  const handleSelectAccount = (account: Account) => {
+    pushView(ViewState.ACCOUNT_DETAIL, account);
   };
 
   const handleToggleSelection = (id: string) => {
-    setSelectedIds(prev => {
-        if (prev.includes(id)) {
-            return prev.filter(x => x !== id);
-        } else {
-            return [...prev, id];
-        }
-    });
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  const handleStartAddCustomer = () => {
-    setViewState(ViewState.ADD_CUSTOMER);
+  const handleStartAddAccount = () => {
+    pushView(ViewState.ADD_ACCOUNT);
   };
 
-  const handleSaveCustomer = (newCustomer: Customer) => {
-    const customerWithUser = { ...newCustomer, assignedUserId: currentUser?.id };
-    setCustomers(prev => [customerWithUser, ...prev]);
-    setViewState(ViewState.LIST);
-    showToast("Customer added successfully!");
+  const handleSaveAccount = (newAccount: Account) => {
+    // Inherit user's branch
+    const accWithUser = { ...newAccount, assignedUserId: currentUser?.id, province: currentUser?.province || 'BC', branch: currentUser?.branch || 'VAN' };
+    setAccounts(prev => [accWithUser, ...prev]);
+    window.history.back(); 
+    showToast("Account added successfully!");
   };
 
-  const handleUpdateCustomer = (updatedCustomer: Customer) => {
-      setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
-      setSelectedCustomer(updatedCustomer);
-      showToast("Customer updated!");
+  const handleUpdateAccount = (updated: Account) => {
+      setAccounts(prev => prev.map(c => c.id === updated.id ? updated : c));
+      setSelectedAccount(updated);
+      showToast("Account updated!");
   };
 
   const handleBackToNav = () => {
-    if (currentUser?.role === UserRole.MANAGER) {
-        setViewState(ViewState.MANAGER_DASHBOARD);
+    if (window.history.length > 1) {
+        window.history.back();
     } else {
-        setViewState(ViewState.LIST);
+        if (currentUser?.role === UserRole.ADMIN) setViewState(ViewState.ADMIN_DASHBOARD);
+        else if (currentUser?.role === UserRole.MANAGER) setViewState(ViewState.MANAGER_DASHBOARD);
+        else setViewState(ViewState.LIST);
+        setSelectedAccount(null);
     }
-    setSelectedCustomer(null);
   };
 
   const handleAddVisitStart = () => {
-    setViewState(ViewState.VISIT_FORM);
+    pushView(ViewState.VISIT_FORM, selectedAccount);
   };
 
-  const handleLogVisitForCustomer = (customer: Customer) => {
-      setSelectedCustomer(customer);
-      setViewState(ViewState.VISIT_FORM);
+  const handleLogVisitForAccount = (account: Account) => {
+      pushView(ViewState.VISIT_FORM, account);
   };
 
   const handleSaveVisit = (visit: Visit) => {
-    const visitWithUser = { ...visit, createdByUserId: currentUser?.id };
+    const visitWithUser: Visit = { ...visit, createdByUserId: currentUser?.id, erpSyncStatus: 'PENDING' };
     setVisits(prev => [visitWithUser, ...prev]);
-    setCustomers(prev => prev.map(c => 
-      c.id === visit.customerId ? { ...c, lastVisitDate: visit.date } : c
-    ));
-    setViewState(ViewState.CUSTOMER_DETAIL);
+    // update last visit date on account
+    setAccounts(prev => prev.map(a => a.id === visit.accountId ? { ...a, lastVisitDate: visit.date } : a));
+    window.history.back();
     showToast("Visit logged successfully!");
   };
 
-  const handleStartTrip = async () => {
-      if (!userLocation) {
-          alert("Waiting for GPS...");
-          return;
-      }
-      
+  const handleStartTrip = () => {
+      if (!userLocation) { alert("Waiting for GPS..."); return; }
       if (selectedIds.length === 0) return;
-
-      const selectedCustomers = selectedIds.map(id => customers.find(c => c.id === id)).filter(Boolean) as Customer[];
-
-      // 1. Create Route URL
-      const url = buildGoogleMapsRouteUrl(userLocation, selectedCustomers);
+      const selectedAccs = selectedIds.map(id => accounts.find(c => c.id === id)).filter(Boolean) as Account[];
+      const url = buildGoogleMapsRouteUrl(userLocation, selectedAccs);
       
-      // 2. Save Trip Record
       const newTrip: Trip = {
           id: `t_${Date.now()}`,
           date: new Date().toISOString(),
           name: `Trip - ${new Date().toLocaleDateString()}`,
-          customerIds: selectedCustomers.map(c => c.id),
+          accountIds: selectedAccs.map(c => c.id),
           status: 'In Progress',
           assignedUserId: currentUser?.id || ''
       };
       setTrips(prev => [newTrip, ...prev]);
-
-      // 3. Clear current selection to reset
       setSelectedIds([]);
-
-      // 4. Open Maps
       window.open(url, '_blank');
-      
-      // 5. Switch view to Trips so user sees it when they come back
-      setViewState(ViewState.TRIPS);
+      pushView(ViewState.TRIPS);
   };
 
-  // --- KPI Calculation (Personal) ---
-  const myCustomers = customers.filter(c => c.assignedUserId === currentUser?.id);
-  const totalPipeline = myCustomers.reduce((acc, curr) => acc + (curr.dealValue || 0), 0);
+  const myAccounts = accounts.filter(c => c.assignedUserId === currentUser?.id);
+  
+  const myPipelineValue = opportunities
+    .filter(o => myAccounts.some(a => a.id === o.accountId))
+    .reduce((acc, curr) => acc + curr.value, 0);
+
   const visitsThisWeek = visits.filter(v => {
       const d = new Date(v.date);
       const now = new Date();
       const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       return d > oneWeekAgo && v.createdByUserId === currentUser?.id;
   }).length;
-  const overdueTasks = myCustomers.filter(c => c.nextActionDate && new Date(c.nextActionDate) < new Date()).length;
+  
+  const overdueTasks = opportunities.filter(o => myAccounts.some(a => a.id === o.accountId) && new Date(o.expectedCloseDate) < new Date()).length;
 
   const renderRepDashboardWidget = () => (
       <div className="mx-4 mt-2 mb-4 bg-white rounded-xl shadow-sm border border-slate-200 p-4 grid grid-cols-3 gap-2">
           <div className="text-center border-r border-slate-100">
              <p className="text-[10px] uppercase font-bold text-slate-400">Pipeline</p>
              <p className="text-sm font-black text-slate-800">
-                {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: "compact" }).format(totalPipeline)}
+                {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: "compact" }).format(myPipelineValue)}
              </p>
           </div>
           <div className="text-center border-r border-slate-100">
@@ -226,113 +233,65 @@ const App: React.FC = () => {
       </div>
   );
 
-  // --- Render Helpers ---
-
   const renderMainView = () => (
     <div className="max-w-md mx-auto bg-slate-50 min-h-[100dvh] shadow-xl relative overflow-hidden flex flex-col pt-[env(safe-area-inset-top)]">
-      
-      {/* Toast */}
       {toast && (
           <div className={`absolute top-20 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg z-50 text-sm font-bold animate-fade-in-down ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
               {toast.msg}
           </div>
       )}
-
-      {/* Header */}
       <div className="bg-white px-5 pt-8 pb-2 shadow-sm z-20 sticky top-0">
         <div className="flex justify-between items-center mb-4">
            <div className="flex items-center gap-3">
-              <button onClick={() => setViewState(ViewState.SETTINGS)}>
+              <button onClick={() => pushView(ViewState.SETTINGS)}>
                   <img src={currentUser?.avatarUrl} className="w-10 h-10 rounded-full border-2 border-slate-100" alt="profile" />
               </button>
               <div>
                   <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">FieldFocus</h1>
                   <p className="text-xs text-slate-500 font-medium">
-                    Hello, {currentUser?.name.split(' ')[0]}
+                    {currentUser?.role === UserRole.ADMIN ? 'Administrator' : `Hello, ${currentUser?.name.split(' ')[0]}`}
                   </p>
               </div>
            </div>
-           
-           {/* Reps see New Customer button */}
            {currentUser?.role === UserRole.REP && (
-               <button 
-                 onClick={handleStartAddCustomer}
-                 className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md active:scale-95 transition-transform flex items-center gap-1"
-               >
+               <button onClick={handleStartAddAccount} className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md active:scale-95 transition-transform flex items-center gap-1">
                  <span>+ New</span>
                </button>
            )}
         </div>
-
-        {/* View Switcher (Tabs) */}
         <div className="flex bg-slate-100 p-1 rounded-lg mb-2">
-          {currentUser?.role === UserRole.MANAGER ? (
-             <button 
-                className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${viewState === ViewState.MANAGER_DASHBOARD ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
-                onClick={() => setViewState(ViewState.MANAGER_DASHBOARD)}
-             >
-                Dashboard
-             </button>
+          {currentUser?.role === UserRole.ADMIN ? (
+               <button className="flex-1 py-1.5 text-sm font-medium rounded-md bg-white text-slate-900 shadow-sm">Admin</button>
           ) : (
-             <button 
-                className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${viewState === ViewState.LIST ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
-                onClick={() => setViewState(ViewState.LIST)}
-             >
-                My List
-             </button>
+            <>
+                {currentUser?.role === UserRole.MANAGER && (
+                    <button className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${viewState === ViewState.MANAGER_DASHBOARD ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`} onClick={() => pushView(ViewState.MANAGER_DASHBOARD)}>Dash</button>
+                )}
+                <button className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${viewState === ViewState.LIST ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`} onClick={() => pushView(ViewState.LIST)}>{currentUser?.role === UserRole.MANAGER ? 'Accts' : 'My List'}</button>
+                <button className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${viewState === ViewState.MAP ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`} onClick={() => pushView(ViewState.MAP)}>Map</button>
+                <button className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${viewState === ViewState.TRIPS ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`} onClick={() => pushView(ViewState.TRIPS)}>Trips</button>
+            </>
           )}
-
-          <button 
-            className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${viewState === ViewState.MAP ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
-            onClick={() => setViewState(ViewState.MAP)}
-          >
-            Map
-          </button>
-           <button 
-            className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${viewState === ViewState.TRIPS ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
-            onClick={() => setViewState(ViewState.TRIPS)}
-          >
-            Trips
-          </button>
-           {/* Manager extra tab for All Customers */}
-           {currentUser?.role === UserRole.MANAGER && (
-               <button 
-                className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${viewState === ViewState.LIST ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
-                onClick={() => setViewState(ViewState.LIST)}
-              >
-                All Cust
-              </button>
-           )}
         </div>
-
-        {/* Search (Only on List) */}
         {viewState === ViewState.LIST && (
             <div className="relative mb-2">
-            <input 
-                type="text" 
-                placeholder={currentUser?.role === UserRole.MANAGER ? "Search all customers..." : "Search my customers..."} 
-                className="w-full pl-10 pr-4 py-2 bg-slate-100 border-none rounded-lg focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-            />
+            <input type="text" placeholder={currentUser?.role === UserRole.MANAGER ? "Search..." : "Search my accounts..."} className="w-full pl-10 pr-4 py-2 bg-slate-100 border-none rounded-lg focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             <svg className="w-5 h-5 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
             </div>
         )}
       </div>
 
-      {/* Content Area */}
       <div className="flex-1 overflow-y-auto no-scrollbar relative bg-slate-50">
-        {viewState === ViewState.MANAGER_DASHBOARD && currentUser?.role === UserRole.MANAGER && (
-            <ManagerDashboard customers={customers} visits={visits} users={MOCK_USERS} />
-        )}
-        
+        {viewState === ViewState.ADMIN_DASHBOARD && <AdminDashboard users={MOCK_USERS} />}
+        {viewState === ViewState.MANAGER_DASHBOARD && currentUser?.role === UserRole.MANAGER && <ManagerDashboard customers={accounts} visits={visits} users={MOCK_USERS} />}
         {viewState === ViewState.LIST && currentUser && (
            <>
                {currentUser.role === UserRole.REP && renderRepDashboardWidget()}
                <CustomerList 
-                    customers={customers} 
+                    customers={accounts}
+                    opportunities={opportunities} 
                     userLocation={userLocation} 
-                    onSelectCustomer={handleSelectCustomer}
+                    onSelectCustomer={handleSelectAccount}
                     searchTerm={searchTerm}
                     selectedIds={selectedIds}
                     onToggleSelection={handleToggleSelection}
@@ -345,43 +304,35 @@ const App: React.FC = () => {
               {userLocation ? (
                  <RadarMap 
                    userLocation={userLocation}
-                   customers={currentUser.role === UserRole.MANAGER ? customers : customers.filter(c => c.assignedUserId === currentUser.id)}
-                   onSelectCustomer={handleSelectCustomer}
+                   // Use the same filtering logic for map as the list
+                   customers={
+                       currentUser.role === UserRole.ADMIN ? accounts :
+                       currentUser.role === UserRole.MANAGER ? accounts.filter(c => c.branch === currentUser.branch) :
+                       accounts.filter(c => c.assignedUserId === currentUser.id)
+                   }
+                   onSelectCustomer={handleSelectAccount}
                    selectedIds={selectedIds}
                    onToggleSelection={handleToggleSelection}
                  />
               ) : (
-                <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                   <p>Waiting for GPS...</p>
-                </div>
+                <div className="flex flex-col items-center justify-center h-64 text-slate-400"><p>Waiting for GPS...</p></div>
               )}
            </div>
         )}
         {viewState === ViewState.TRIPS && (
              <TripList 
                 trips={currentUser?.role === UserRole.MANAGER ? trips : trips.filter(t => t.assignedUserId === currentUser?.id)}
-                customers={customers}
-                onLogVisitForCustomer={handleLogVisitForCustomer}
-                onViewCustomer={handleSelectCustomer}
+                customers={accounts}
+                onLogVisitForCustomer={handleLogVisitForAccount}
+                onViewCustomer={handleSelectAccount}
              />
         )}
       </div>
-
-      {/* Trip Bar (Floating) - Only show on LIST or MAP when selections exist */}
       {selectedIds.length > 0 && (viewState === ViewState.LIST || viewState === ViewState.MAP) && (
           <div className="absolute bottom-6 left-4 right-4 z-30 mb-[env(safe-area-inset-bottom)]">
               <div className="bg-slate-900 rounded-xl p-4 shadow-2xl flex items-center justify-between text-white">
-                  <div>
-                      <p className="text-xs text-slate-400 font-bold uppercase">Trip Planner</p>
-                      <p className="font-bold">{selectedIds.length} stops selected</p>
-                  </div>
-                  <button 
-                    onClick={handleStartTrip}
-                    className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors"
-                  >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                      Start Trip
-                  </button>
+                  <div><p className="text-xs text-slate-400 font-bold uppercase">Trip Planner</p><p className="font-bold">{selectedIds.length} stops selected</p></div>
+                  <button onClick={handleStartTrip} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors">Start Trip</button>
               </div>
           </div>
       )}
@@ -389,41 +340,47 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="bg-slate-200 min-h-screen font-sans">
-      {!currentUser || viewState === ViewState.AUTH ? (
+    <>
+      {viewState === ViewState.AUTH ? (
           <AuthScreen onLogin={handleLogin} />
-      ) : viewState === ViewState.SETTINGS ? (
+      ) : viewState === ViewState.ADD_ACCOUNT ? (
+          <AddCustomerForm 
+             userLocation={userLocation} 
+             onSave={handleSaveAccount} 
+             onCancel={handleBackToNav}
+          />
+      ) : viewState === ViewState.VISIT_FORM ? (
+          selectedAccount ? (
+              <VisitForm 
+                customer={selectedAccount}
+                onSave={handleSaveVisit}
+                onCancel={handleBackToNav}
+              />
+          ) : null
+      ) : viewState === ViewState.ACCOUNT_DETAIL ? (
+          selectedAccount ? (
+              <CustomerDetail 
+                customer={selectedAccount} 
+                contacts={contacts.filter(c => c.accountId === selectedAccount.id)}
+                opportunities={opportunities.filter(o => o.accountId === selectedAccount.id)}
+                visits={visits}
+                onBack={handleBackToNav}
+                onAddVisit={handleAddVisitStart}
+                onUpdateCustomer={handleUpdateAccount}
+              />
+          ) : null
+      ) : viewState === ViewState.SETTINGS && currentUser ? (
           <SettingsScreen 
-            currentUser={currentUser} 
-            customers={customers} 
-            visits={visits} 
+            currentUser={currentUser}
+            customers={accounts}
+            visits={visits}
             onLogout={handleLogout}
             onBack={handleBackToNav}
           />
-      ) : viewState === ViewState.CUSTOMER_DETAIL && selectedCustomer ? (
-        <CustomerDetail 
-          customer={selectedCustomer} 
-          visits={visits}
-          onBack={handleBackToNav}
-          onAddVisit={handleAddVisitStart}
-          onUpdateCustomer={handleUpdateCustomer}
-        />
-      ) : viewState === ViewState.VISIT_FORM && selectedCustomer ? (
-        <VisitForm 
-          customer={selectedCustomer}
-          onSave={handleSaveVisit}
-          onCancel={() => setViewState(ViewState.CUSTOMER_DETAIL)} 
-        />
-      ) : viewState === ViewState.ADD_CUSTOMER ? (
-        <AddCustomerForm
-          userLocation={userLocation}
-          onSave={handleSaveCustomer}
-          onCancel={handleBackToNav}
-        />
       ) : (
-        renderMainView()
+          renderMainView()
       )}
-    </div>
+    </>
   );
 };
 

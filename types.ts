@@ -1,17 +1,20 @@
 
+
 export enum ViewState {
   AUTH = 'AUTH',
   LIST = 'LIST',
   MAP = 'MAP',
   TRIPS = 'TRIPS',
-  CUSTOMER_DETAIL = 'CUSTOMER_DETAIL',
+  ACCOUNT_DETAIL = 'ACCOUNT_DETAIL',
   VISIT_FORM = 'VISIT_FORM',
-  ADD_CUSTOMER = 'ADD_CUSTOMER',
+  ADD_ACCOUNT = 'ADD_ACCOUNT',
   SETTINGS = 'SETTINGS',
-  MANAGER_DASHBOARD = 'MANAGER_DASHBOARD'
+  MANAGER_DASHBOARD = 'MANAGER_DASHBOARD',
+  ADMIN_DASHBOARD = 'ADMIN_DASHBOARD'
 }
 
 export enum UserRole {
+  ADMIN = 'ADMIN',
   MANAGER = 'MANAGER',
   REP = 'REP'
 }
@@ -21,6 +24,9 @@ export interface User {
   name: string;
   role: UserRole;
   avatarUrl: string;
+  province?: string; 
+  branch?: string; // e.g. 'VAN', 'TOR'
+  erpId?: string;
 }
 
 export interface Coordinates {
@@ -28,71 +34,98 @@ export interface Coordinates {
   lng: number;
 }
 
+export interface AccountAddress {
+  id: string;
+  type: 'BILL_TO' | 'SHIP_TO';
+  shipToNumber?: number; // 1, 2, 3...
+  description?: string; // "Warehouse B" or "Head Office"
+  address: string;
+  city: string;
+  province: string;
+  postalCode?: string;
+  coordinates: Coordinates;
+  isDefault: boolean; // Typically Ship To #1
+}
+
+// 1. ACCOUNTS (Companies)
+export interface Account {
+  id: string;        
+  erpId: string;     
+  name: string;      
+  
+  // Primary Display Address (Usually Ship To #1)
+  address: string;
+  city: string;
+  province: string;
+  postalCode?: string;
+  coordinates: Coordinates;
+
+  // Full Address List
+  addresses: AccountAddress[];
+
+  // Business info
+  branch?: string; // e.g. 'VAN'
+  industry?: string;
+  tier: 'High' | 'Mid' | 'Low' | 'Prospect'; // Mapped from Grade
+  status: 'Active' | 'Prospect' | 'Churned';
+  paymentTerms?: string;
+  creditLimit?: number;
+  
+  // Assignment
+  assignedUserId?: string; 
+  
+  // Metadata
+  lastSaleDate?: string;
+  totalRevenue?: number;
+  tags?: string[];
+  avatarUrl?: string;
+  lastVisitDate?: string;
+}
+
+// 2. CONTACTS (People)
 export interface Contact {
   id: string;
-  name: string;
-  position: string;
-  phone?: string;
+  erpId?: string;
+  accountId: string; 
+  firstName: string;
+  lastName: string;
+  title: string;
   email?: string;
-  isPrimary?: boolean;
+  phone?: string;
+  isPrimary: boolean;
+}
+
+// 3. OPPORTUNITIES (Deals)
+export interface Opportunity {
+  id: string;
+  accountId: string;
+  title: string;       
+  value: number;       
+  stage: 'New' | 'Qualifying' | 'Proposal' | 'Negotiation' | 'Closed Won' | 'Closed Lost';
+  probability: number; 
+  expectedCloseDate: string;
+  nextStep?: string;
 }
 
 export interface Visit {
   id: string;
-  customerId: string;
-  date: string; // ISO string
+  accountId: string; 
+  locationId?: string; // Which address was visited
+  date: string;
   notes: string;
-  summary?: string; // AI generated summary
-  photos?: string[]; // Base64 strings
+  summary?: string;
+  photos?: string[];
   createdByUserId?: string;
+  erpSyncStatus?: 'PENDING' | 'SYNCED'; 
 }
 
 export interface Trip {
   id: string;
-  date: string; // ISO string
-  name: string; // e.g., "Trip to Richmond"
-  customerIds: string[];
+  date: string;
+  name: string;
+  accountIds: string[];
   status: 'Planned' | 'In Progress' | 'Completed';
   assignedUserId: string;
-}
-
-export type Tier = 'High' | 'Mid' | 'Low' | 'Prospect';
-
-export interface Customer {
-  id: string;
-  name: string; // This is now the "Company Name" basically
-  company: string; // Redundant but keeping for backward compat, usually same as name now
-  
-  // Legacy CRM Fields from Screenshot
-  visibleId?: string; // e.g. "2AH"
-  paymentTerms?: string; // e.g. "1 - NET 30 DAYS"
-  source?: string; // e.g. "NAPS CANADA"
-  lastSaleDate?: string;
-  performanceRatio?: number; // e.g. 0.384
-
-  address: string;
-  city?: string;
-  coordinates: Coordinates;
-  
-  // Contact Info (Company Level)
-  email: string;
-  phone: string;
-  
-  status: 'Active' | 'Prospect' | 'Churned';
-  tier?: Tier;
-  tags?: string[];
-  
-  lastVisitDate?: string;
-  createdAt?: string;
-  avatarUrl: string;
-  
-  contacts: Contact[];
-  assignedUserId?: string; // For RBAC
-  
-  // CRM Specific Fields
-  dealValue?: number; // Potential or current revenue
-  nextActionText?: string; // e.g. "Send Contract", "Follow up on pricing"
-  nextActionDate?: string; // ISO Date for the deadline
 }
 
 export interface UserLocation extends Coordinates {

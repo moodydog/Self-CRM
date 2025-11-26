@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import { Customer, Coordinates } from '../types';
+import { Account, Coordinates } from '../types';
 import { calculateDistance } from '../services/geoService';
 
 interface RadarMapProps {
   userLocation: Coordinates;
-  customers: Customer[];
-  onSelectCustomer: (c: Customer) => void;
+  customers: Account[];
+  onSelectCustomer: (c: Account) => void;
   selectedIds: string[];
   onToggleSelection: (id: string) => void;
 }

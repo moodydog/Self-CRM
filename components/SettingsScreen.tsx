@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
-import { Customer, Visit, User, Trip } from '../types';
+import { Account, Visit, User, Trip } from '../types';
 
 interface SettingsScreenProps {
   currentUser: User;
-  customers: Customer[];
+  customers: Account[];
   visits: Visit[];
   onLogout: () => void;
   onBack: () => void;

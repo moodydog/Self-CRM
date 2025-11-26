@@ -1,10 +1,9 @@
-
 import React from 'react';
-import { Customer, Visit, User } from '../types';
+import { Account, Visit, User } from '../types';
 import { MOCK_USERS } from '../constants';
 
 interface ManagerDashboardProps {
-  customers: Customer[];
+  customers: Account[];
   visits: Visit[];
   users: User[];
 }
@@ -16,7 +15,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ customers, visits, 
       const repCustomers = customers.filter(c => c.assignedUserId === rep.id);
       const repVisits = visits.filter(v => v.createdByUserId === rep.id);
       
-      const pipeline = repCustomers.reduce((acc, c) => acc + (c.dealValue || 0), 0);
+      const pipeline = repCustomers.reduce((acc, c) => acc + (c.totalRevenue || 0), 0);
       const activeDeals = repCustomers.filter(c => c.status === 'Active').length;
       
       return {
@@ -27,7 +26,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ customers, visits, 
       };
   }).sort((a, b) => b.pipeline - a.pipeline);
 
-  const totalPipeline = customers.reduce((acc, c) => acc + (c.dealValue || 0), 0);
+  const totalPipeline = customers.reduce((acc, c) => acc + (c.totalRevenue || 0), 0);
   const totalVisits = visits.length;
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0, notation: "compact" }).format(val);
@@ -81,7 +80,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ customers, visits, 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           {visits.slice(0, 5).map((visit, idx) => {
               const rep = users.find(u => u.id === visit.createdByUserId);
-              const customer = customers.find(c => c.id === visit.customerId);
+              const customer = customers.find(c => c.id === visit.accountId);
               
               return (
                   <div key={visit.id} className={`p-3 flex gap-3 ${idx !== 4 ? 'border-b border-slate-50' : ''}`}>

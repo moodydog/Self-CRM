@@ -1,16 +1,17 @@
 
 import React, { useState } from 'react';
-import { Customer, Visit } from '../types';
+import { Account, Visit } from '../types';
 import { polishVisitNotes } from '../services/geminiService';
 
 interface VisitFormProps {
-  customer: Customer;
+  customer: Account;
   onSave: (visit: Visit) => void;
   onCancel: () => void;
 }
 
 const VisitForm: React.FC<VisitFormProps> = ({ customer, onSave, onCancel }) => {
   const [notes, setNotes] = useState('');
+  const [locationId, setLocationId] = useState(customer.addresses.find(a => a.isDefault)?.id || customer.addresses[0]?.id || '');
   const [isPolishing, setIsPolishing] = useState(false);
   const [images, setImages] = useState<string[]>([]);
 
@@ -41,7 +42,8 @@ const VisitForm: React.FC<VisitFormProps> = ({ customer, onSave, onCancel }) => 
     e.preventDefault();
     const newVisit: Visit = {
       id: Date.now().toString(),
-      customerId: customer.id,
+      accountId: customer.id,
+      locationId: locationId,
       date: new Date().toISOString(),
       notes: notes,
       photos: images
@@ -54,68 +56,45 @@ const VisitForm: React.FC<VisitFormProps> = ({ customer, onSave, onCancel }) => 
       <div className="sticky top-0 bg-white z-10 border-b border-slate-200 px-4 py-3 flex items-center justify-between">
         <button onClick={onCancel} className="text-slate-500 font-medium">Cancel</button>
         <h1 className="text-lg font-bold text-slate-800">New Visit</h1>
-        <button 
-          onClick={handleSubmit} 
-          disabled={!notes.trim()}
-          className="text-blue-600 font-bold disabled:opacity-50"
-        >
-          Save
-        </button>
+        <button onClick={handleSubmit} disabled={!notes.trim()} className="text-blue-600 font-bold disabled:opacity-50">Save</button>
       </div>
-
       <div className="p-5 flex-1">
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-slate-700 mb-1">Customer</label>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-slate-700 mb-1">Account</label>
           <div className="text-lg font-bold text-slate-900">{customer.name}</div>
-          <div className="text-slate-500 text-sm">{customer.company}</div>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-slate-700 mb-2">Location Visited</label>
+          <select 
+             value={locationId} 
+             onChange={(e) => setLocationId(e.target.value)}
+             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+          >
+              {customer.addresses.map(addr => (
+                  <option key={addr.id} value={addr.id}>
+                      {addr.type === 'SHIP_TO' ? `Ship To #${addr.shipToNumber}` : 'Billing'} - {addr.address}, {addr.city}
+                  </option>
+              ))}
+          </select>
         </div>
 
         <div className="mb-6 relative">
           <label className="block text-sm font-medium text-slate-700 mb-2 flex justify-between items-center">
             <span>Visit Notes</span>
-            <button 
-              type="button"
-              onClick={handlePolish}
-              disabled={isPolishing || !notes.trim()}
-              className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full flex items-center gap-1 hover:bg-purple-200 transition-colors disabled:opacity-50"
-            >
-              {isPolishing ? (
-                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-              ) : (
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-              )}
-              AI Polish
+            <button type="button" onClick={handlePolish} disabled={isPolishing || !notes.trim()} className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full flex items-center gap-1 hover:bg-purple-200 transition-colors disabled:opacity-50">
+              {isPolishing ? "..." : "AI Polish"}
             </button>
           </label>
-          <textarea
-            className="w-full h-48 p-3 bg-slate-50 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none text-slate-700 text-base"
-            placeholder="Type your rough notes here... e.g. 'Met with Sarah, she wants 100 widgets next week, complained about delivery time.'"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          ></textarea>
-           <p className="text-xs text-slate-400 mt-2">
-             Tip: Use "AI Polish" to turn rough bullet points into a professional summary.
-           </p>
+          <textarea className="w-full h-40 p-3 bg-slate-50 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none text-slate-700 text-base" placeholder="Type your rough notes here..." value={notes} onChange={(e) => setNotes(e.target.value)}></textarea>
         </div>
-
         <div className="mb-6">
            <label className="block text-sm font-medium text-slate-700 mb-2">Photos</label>
            <div className="grid grid-cols-4 gap-2">
-              {images.map((img, idx) => (
-                <div key={idx} className="aspect-square rounded-lg overflow-hidden border border-slate-200 relative">
-                   <img src={img} alt="upload" className="w-full h-full object-cover" />
-                </div>
-              ))}
+              {images.map((img, idx) => (<div key={idx} className="aspect-square rounded-lg overflow-hidden border border-slate-200 relative"><img src={img} alt="upload" className="w-full h-full object-cover" /></div>))}
               <label className="aspect-square rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-blue-400 bg-slate-50 text-slate-400 hover:text-blue-500">
-                 <input 
-                   type="file" 
-                   accept="image/*" 
-                   capture="environment"
-                   multiple 
-                   className="hidden" 
-                   onChange={handleImageUpload} 
-                 />
-                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                 <input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={handleImageUpload} />
+                 <span>+</span>
               </label>
            </div>
         </div>
@@ -123,5 +102,4 @@ const VisitForm: React.FC<VisitFormProps> = ({ customer, onSave, onCancel }) => 
     </div>
   );
 };
-
 export default VisitForm;
